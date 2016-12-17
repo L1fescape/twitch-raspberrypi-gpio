@@ -3,10 +3,14 @@ import socket
 import select
 import re
 
+import requests
+import json
+
 import RPi.GPIO as GPIO
 import time
 
 ledPin = 18
+lightsOn = False
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(ledPin, GPIO.OUT)
@@ -33,6 +37,7 @@ def sendmsg(chan,msg):
 def getmsg(msg):
     ''' GET IMPORTANT MESSAGE '''
     msg_edit = msg.split(':',2)
+    global lightsOn
     if(len(msg_edit) > 2):
         user = msg_edit[1].split('!',1)[0] # User
         message = msg_edit[2] # Message
@@ -42,13 +47,23 @@ def getmsg(msg):
 
         datelog = datetime.datetime.now()
 
-        command = msg_split[0].strip().lower()
-        if(command == '!lights'):
-            val = msg_split[1] == "1"
-            if val:
-                GPIO.output(ledPin, GPIO.HIGH)
-            else:
-                GPIO.output(ledPin, GPIO.LOW)
+        if len(msg_split) > 0:
+            command = msg_split[0].strip().lower()
+            if(command == '!lights'):
+                if len(msg_split) > 1:
+                    lightsOn = True if msg_split[1] == "1" else False
+                else:
+                    lightsOn = not lightsOn
+
+                if lightsOn:
+                    GPIO.output(ledPin, GPIO.HIGH)
+                else:
+                    GPIO.output(ledPin, GPIO.LOW)
+
+                requests.post("http://192.168.1.81:3001/lights",
+                    data=json.dumps({'user': user, 'state': "on" if lightsOn else "off"}),
+                    headers={'content-type': 'application/json'}
+                )
 
 
 # Connect to the server using the provided details
